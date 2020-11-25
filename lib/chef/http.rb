@@ -22,11 +22,13 @@
 #
 
 require "tempfile" unless defined?(Tempfile)
-require "openssl" unless defined?(OpenSSL)
-require "net/http" unless defined?(Net::HTTP)
-require "uri" unless defined?(URI)
+autoload :OpenSSL, "openssl"
+autoload :URI, "uri"
+module Net
+  autoload :HTTP, "net/http"
+  autoload :HTTPClientException, "net/http"
+end
 require_relative "http/basic_client"
-require_relative "monkey_patches/net_http"
 require_relative "config"
 require_relative "platform/query_helpers"
 require_relative "exceptions"
@@ -163,10 +165,6 @@ class Chef
       end
     rescue Exception => exception
       log_failed_request(response, return_value) unless response.nil?
-
-      if exception.respond_to?(:chef_rest_request=)
-        exception.chef_rest_request = rest_request
-      end
       raise
     end
 
@@ -202,9 +200,6 @@ class Chef
       end
     rescue Exception => e
       log_failed_request(response, return_value) unless response.nil?
-      if e.respond_to?(:chef_rest_request=)
-        e.chef_rest_request = rest_request
-      end
       raise
     end
 
@@ -258,9 +253,6 @@ class Chef
       end
     rescue Exception => e
       log_failed_request(response, return_value) unless response.nil?
-      if e.respond_to?(:chef_rest_request=)
-        e.chef_rest_request = rest_request
-      end
       raise
     end
 

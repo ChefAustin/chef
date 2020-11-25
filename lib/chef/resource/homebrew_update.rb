@@ -19,11 +19,14 @@
 #
 
 require_relative "../resource"
-require_relative "../dist"
+require_relative "../mixin/homebrew_user"
+require "chef-utils/dist" unless defined?(ChefUtils::Dist)
 
 class Chef
   class Resource
     class HomebrewUpdate < Chef::Resource
+      include Chef::Mixin::HomebrewUser
+
       unified_mode true
 
       provides(:homebrew_update) { true }
@@ -38,7 +41,7 @@ class Chef
           action :periodic
         end
         ```
-        **Update the Homebrew repository at the start of a #{Chef::Dist::PRODUCT} run**:
+        **Update the Homebrew repository at the start of a #{ChefUtils::Dist::Infra::PRODUCT} run**:
         ```ruby
         homebrew_update 'update'
         ```
@@ -62,8 +65,8 @@ class Chef
         #
         # @return [Boolean]
         def brew_up_to_date?
-          ::File.exist?("#{BREW_STAMP}") &&
-            ::File.mtime("#{BREW_STAMP}") > Time.now - new_resource.frequency
+          ::File.exist?(BREW_STAMP) &&
+            ::File.mtime(BREW_STAMP) > Time.now - new_resource.frequency
         end
 
         def do_update
@@ -71,7 +74,7 @@ class Chef
             recursive true
           end
 
-          file "#{BREW_STAMP}" do
+          file BREW_STAMP do
             content "BREW::Update::Post-Invoke-Success\n"
             action :create_if_missing
           end
@@ -79,7 +82,7 @@ class Chef
           execute "brew update" do
             command %w{brew update}
             default_env true
-            user Homebrew.owner
+            user find_homebrew_uid
             notifies :touch, "file[#{BREW_STAMP}]", :immediately
           end
         end

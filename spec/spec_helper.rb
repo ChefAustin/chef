@@ -68,7 +68,7 @@ end
 
 # If you want to load anything into the testing environment
 # without versioning it, add it to spec/support/local_gems.rb
-require "spec/support/local_gems.rb" if File.exist?(File.join(File.dirname(__FILE__), "support", "local_gems.rb"))
+require "spec/support/local_gems" if File.exist?(File.join(File.dirname(__FILE__), "support", "local_gems.rb"))
 
 # Explicitly require spec helpers that need to load first
 require "spec/support/platform_helpers"
@@ -141,9 +141,10 @@ RSpec.configure do |config|
 
   config.filter_run_excluding windows_only: true unless windows?
   config.filter_run_excluding not_supported_on_windows: true if windows?
-  config.filter_run_excluding not_supported_on_macos: true if mac_osx?
-  config.filter_run_excluding macos_only: true unless mac_osx?
-  config.filter_run_excluding macos_1014: true unless mac_osx_1014?
+  config.filter_run_excluding not_supported_on_macos: true if macos?
+  config.filter_run_excluding macos_only: true unless macos?
+  config.filter_run_excluding macos_1013: true unless macos_1013?
+  config.filter_run_excluding macos_gte_1014: true unless macos_gte_1014?
   config.filter_run_excluding not_supported_on_aix: true if aix?
   config.filter_run_excluding not_supported_on_solaris: true if solaris?
   config.filter_run_excluding not_supported_on_gce: true if gce?
@@ -199,6 +200,7 @@ RSpec.configure do |config|
   # check for particular binaries we need
   config.filter_run_excluding choco_installed: true unless choco_installed?
   config.filter_run_excluding requires_ifconfig: true unless ifconfig?
+  config.filter_run_excluding pwsh_installed: true unless pwsh_installed?
 
   running_platform_arch = `uname -m`.strip unless windows?
 
@@ -241,6 +243,8 @@ RSpec.configure do |config|
     Chef::Config.reset
 
     Chef::Log.setup!
+
+    Chef::ServerAPIVersions.instance.reset!
 
     Chef::Config[:log_level] = :fatal
     Chef::Log.level(Chef::Config[:log_level])
@@ -306,8 +310,6 @@ RSpec.configure do |config|
 end
 
 require "webrick/utils"
-require "thread"
-
 #    Webrick uses a centralized/synchronized timeout manager. It works by
 #    starting a thread to check for timeouts on an interval. The timeout
 #    checker thread cannot be stopped or canceled in any easy way, and it

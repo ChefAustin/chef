@@ -23,7 +23,7 @@ end
 require_relative "config"
 require_relative "exceptions"
 require "timeout" unless defined?(Timeout)
-require_relative "dist"
+require "chef-utils" unless defined?(ChefUtils::CANARY)
 
 class Chef
 
@@ -96,7 +96,7 @@ class Chef
     # Waits until acquiring the system-wide lock.
     #
     def wait
-      Chef::Log.warn("#{Chef::Dist::PRODUCT} #{runpid} is running, will wait for it to finish and then run.")
+      Chef::Log.warn("#{ChefUtils::Dist::Infra::PRODUCT} #{runpid} is running, will wait for it to finish and then run.")
       if ChefUtils.windows?
         mutex.wait
       else
@@ -173,7 +173,7 @@ class Chef
     # Mutex name is case-sensitive contrary to other things in
     # windows. "\" is the only invalid character.
     def acquire_win32_mutex
-      @mutex = Chef::ReservedNames::Win32::Mutex.new("Global\\#{runlock_file.gsub(/[\\]/, "/").downcase}")
+      @mutex = Chef::ReservedNames::Win32::Mutex.new("Global\\#{runlock_file.tr('\\', "/").downcase}")
       mutex.test
     end
 

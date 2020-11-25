@@ -18,7 +18,7 @@
 
 require_relative "bootstrap_context"
 require_relative "../../util/path_helper"
-require_relative "../../dist"
+require "chef-utils/dist" unless defined?(ChefUtils::Dist)
 
 class Chef
   class Knife
@@ -32,6 +32,7 @@ class Chef
       class WindowsBootstrapContext < BootstrapContext
         attr_accessor :config
         attr_accessor :chef_config
+        attr_accessor :secret
 
         def initialize(config, run_list, chef_config, secret = nil)
           @config       = config
@@ -49,8 +50,8 @@ class Chef
           end
         end
 
-        def secret
-          escape_and_echo(config[:secret])
+        def encrypted_data_bag_secret
+          escape_and_echo(@secret)
         end
 
         def trusted_certs_script
@@ -134,8 +135,8 @@ class Chef
             client_rb << %Q{no_proxy       "#{config[:bootstrap_no_proxy]}"\n}
           end
 
-          if config[:secret]
-            client_rb << %Q{encrypted_data_bag_secret "#{ChefConfig::Config.etc_chef_dir(windows: true)}/encrypted_data_bag_secret"\n}
+          if secret
+            client_rb << %Q{encrypted_data_bag_secret "#{ChefConfig::PathHelper.escapepath(ChefConfig::Config.etc_chef_dir(windows: true))}\\\\encrypted_data_bag_secret"\n}
           end
 
           unless trusted_certs_script.empty?
@@ -175,7 +176,7 @@ class Chef
           bootstrap_environment_option = bootstrap_environment.nil? ? "" : " -E #{bootstrap_environment}"
 
           start_chef = "SET \"PATH=%SYSTEM32%;%SystemRoot%;%SYSTEM32%\\Wbem;%SYSTEM32%\\WindowsPowerShell\\v1.0\\;C:\\ruby\\bin;#{c_opscode_dir}\\bin;#{c_opscode_dir}\\embedded\\bin\;%PATH%\"\n"
-          start_chef << "#{Chef::Dist::CLIENT} -c #{client_rb} -j #{first_boot}#{bootstrap_environment_option}\n"
+          start_chef << "#{ChefUtils::Dist::Infra::CLIENT} -c #{client_rb} -j #{first_boot}#{bootstrap_environment_option}\n"
         end
 
         def win_wget
@@ -255,6 +256,8 @@ class Chef
                [String] $localPath
             )
 
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
             $ProxyUrl = $env:http_proxy;
             $webClient = new-object System.Net.WebClient;
 
@@ -288,7 +291,7 @@ class Chef
         end
 
         def local_download_path
-          "%TEMP%\\#{Chef::Dist::CLIENT}-latest.msi"
+          "%TEMP%\\#{ChefUtils::Dist::Infra::CLIENT}-latest.msi"
         end
 
         # Build a URL to query www.chef.io that will redirect to the correct
@@ -365,7 +368,7 @@ class Chef
           <<~EOH
             @set MSIERRORCODE=!ERRORLEVEL!
             @if ERRORLEVEL 1 (
-                @echo WARNING: Failed to install #{Chef::Dist::PRODUCT} MSI package in remote context with status code !MSIERRORCODE!.
+                @echo WARNING: Failed to install #{ChefUtils::Dist::Infra::PRODUCT} MSI package in remote context with status code !MSIERRORCODE!.
                 @echo WARNING: This may be due to a defect in operating system update KB2918614: http://support.microsoft.com/kb/2918614
                 @set OLDLOGLOCATION="%CHEF_CLIENT_MSI_LOG_PATH%-fail.log"
                 @move "%CHEF_CLIENT_MSI_LOG_PATH%" "!OLDLOGLOCATION!" > NUL
@@ -374,26 +377,26 @@ class Chef
                 @schtasks /create /f  /sc once /st 00:00:00 /tn chefclientbootstraptask /ru SYSTEM /rl HIGHEST /tr \"cmd /c #{command} & sleep 2 & waitfor /s %computername% /si chefclientinstalldone\"
 
                 @if ERRORLEVEL 1 (
-                    @echo ERROR: Failed to create #{Chef::Dist::PRODUCT} installation scheduled task with status code !ERRORLEVEL! > "&2"
+                    @echo ERROR: Failed to create #{ChefUtils::Dist::Infra::PRODUCT} installation scheduled task with status code !ERRORLEVEL! > "&2"
                 ) else (
-                    @echo Successfully created scheduled task to install #{Chef::Dist::PRODUCT}.
+                    @echo Successfully created scheduled task to install #{ChefUtils::Dist::Infra::PRODUCT}.
                     @schtasks /run /tn chefclientbootstraptask
                     @if ERRORLEVEL 1 (
-                        @echo ERROR: Failed to execute #{Chef::Dist::PRODUCT} installation scheduled task with status code !ERRORLEVEL!. > "&2"
+                        @echo ERROR: Failed to execute #{ChefUtils::Dist::Infra::PRODUCT} installation scheduled task with status code !ERRORLEVEL!. > "&2"
                     ) else (
-                        @echo Successfully started #{Chef::Dist::PRODUCT} installation scheduled task.
+                        @echo Successfully started #{ChefUtils::Dist::Infra::PRODUCT} installation scheduled task.
                         @echo Waiting for installation to complete -- this may take a few minutes...
                         waitfor chefclientinstalldone /t 600
                         if ERRORLEVEL 1 (
-                            @echo ERROR: Timed out waiting for #{Chef::Dist::PRODUCT} package to install
+                            @echo ERROR: Timed out waiting for #{ChefUtils::Dist::Infra::PRODUCT} package to install
                         ) else (
-                            @echo Finished waiting for #{Chef::Dist::PRODUCT} package to install.
+                            @echo Finished waiting for #{ChefUtils::Dist::Infra::PRODUCT} package to install.
                         )
                         @schtasks /delete /f /tn chefclientbootstraptask > NUL
                     )
                 )
             ) else (
-                @echo Successfully installed #{Chef::Dist::PRODUCT} package.
+                @echo Successfully installed #{ChefUtils::Dist::Infra::PRODUCT} package.
             )
           EOH
         end

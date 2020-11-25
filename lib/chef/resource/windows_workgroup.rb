@@ -16,11 +16,13 @@
 #
 
 require_relative "../resource"
-require_relative "../dist"
+require "chef-utils/dist" unless defined?(ChefUtils::Dist)
 
 class Chef
   class Resource
     class WindowsWorkgroup < Chef::Resource
+      unified_mode true
+
       provides :windows_workgroup
 
       description "Use the **windows_workgroup** resource to join or change the workgroup of a Windows host."
@@ -59,8 +61,8 @@ class Chef
 
       property :reboot, Symbol,
         equal_to: %i{never request_reboot reboot_now},
-        validation_message: "The reboot property accepts :immediate (reboot as soon as the resource completes), :delayed (reboot once the #{Chef::Dist::PRODUCT} run completes), and :never (Don't reboot)",
-        description: "Controls the system reboot behavior post workgroup joining. Reboot immediately, after the #{Chef::Dist::PRODUCT} run completes, or never. Note that a reboot is necessary for changes to take effect.",
+        validation_message: "The reboot property accepts :immediate (reboot as soon as the resource completes), :delayed (reboot once the #{ChefUtils::Dist::Infra::PRODUCT} run completes), and :never (Don't reboot)",
+        description: "Controls the system reboot behavior post workgroup joining. Reboot immediately, after the #{ChefUtils::Dist::Infra::PRODUCT} run completes, or never. Note that a reboot is necessary for changes to take effect.",
         coerce: proc { |x| clarify_reboot(x) },
         default: :immediate, desired_state: false
 
@@ -90,8 +92,8 @@ class Chef
 
         unless workgroup_member?
           converge_by("join workstation workgroup #{new_resource.workgroup_name}") do
-            ps_run = powershell_out(join_command)
-            raise "Failed to join the workgroup #{new_resource.workgroup_name}: #{ps_run.stderr}}" if ps_run.error?
+            ps_run = powershell_exec(join_command)
+            raise "Failed to join the workgroup #{new_resource.workgroup_name}: #{ps_run.errors}}" if ps_run.error?
 
             unless new_resource.reboot == :never
               reboot "Reboot to join workgroup #{new_resource.workgroup_name}" do
@@ -117,10 +119,10 @@ class Chef
 
         # @return [Boolean] is the node a member of the workgroup specified in the resource
         def workgroup_member?
-          node_workgroup = powershell_out!("(Get-WmiObject -Class Win32_ComputerSystem).Workgroup")
+          node_workgroup = powershell_exec!("(Get-WmiObject -Class Win32_ComputerSystem).Workgroup")
           raise "Failed to determine if system already a member of workgroup #{new_resource.workgroup_name}" if node_workgroup.error?
 
-          node_workgroup.stdout.downcase.strip == new_resource.workgroup_name.downcase
+          String(node_workgroup.result).downcase.strip == new_resource.workgroup_name.downcase
         end
       end
     end

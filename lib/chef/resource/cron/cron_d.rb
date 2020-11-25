@@ -18,7 +18,6 @@
 require_relative "../../resource"
 require_relative "../helpers/cron_validations"
 require "shellwords" unless defined?(Shellwords)
-require_relative "../../dist"
 
 class Chef
   class Resource
@@ -63,7 +62,7 @@ class Chef
           hour '8'
           weekday '6'
           mailto 'admin@example.com'
-          command "/bin/true"
+          command '/bin/true'
           action :create
         end
         ```
@@ -77,7 +76,7 @@ class Chef
           day '*'
           month '11'
           weekday '1-5'
-          command "/bin/true"
+          command '/bin/true'
           action :create
         end
         ```

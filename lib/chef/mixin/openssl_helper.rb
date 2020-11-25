@@ -14,15 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
+autoload :OpenSSL, "openssl"
 
 class Chef
   module Mixin
     # various helpers for use with openssl. Currently used by the openssl_* resources
     module OpenSSLHelper
-      def self.included(_base)
-        require "openssl" unless defined?(::OpenSSL)
-      end
-
       # determine the key filename from the cert filename
       # @param [String] cert_filename the path to the certfile
       # @return [String] the path to the keyfile
@@ -158,7 +155,7 @@ class Chef
       # @return [OpenSSL::PKey::DH]
       def gen_ec_priv_key(curve)
         raise TypeError, "curve must be a string" unless curve.is_a?(String)
-        raise ArgumentError, "Specified curve is not available on this system" unless curve == "prime256v1" || curve == "secp384r1" || curve == "secp521r1"
+        raise ArgumentError, "Specified curve is not available on this system" unless %w{prime256v1 secp384r1 secp521r1}.include?(curve)
 
         ::OpenSSL::PKey::EC.new(curve).generate_key
       end

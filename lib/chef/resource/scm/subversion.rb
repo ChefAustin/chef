@@ -17,7 +17,7 @@
 # limitations under the License.
 #
 
-require_relative "../../dist"
+require "chef-utils/dist" unless defined?(ChefUtils::Dist)
 
 class Chef
   class Resource
@@ -29,6 +29,18 @@ class Chef
       provides :subversion
 
       description "Use the **subversion** resource to manage source control resources that exist in a Subversion repository."
+      examples <<~DOC
+      **Get the latest version of an application**
+
+      ```ruby
+      subversion 'CouchDB Edge' do
+        repository 'http://svn.apache.org/repos/asf/couchdb/trunk'
+        revision 'HEAD'
+        destination '/opt/my_sources/couch'
+        action :sync
+      end
+      ```
+      DOC
 
       allowed_actions :force_export
 
@@ -38,7 +50,7 @@ class Chef
         default: "--no-auth-cache"
 
       property :svn_info_args, [String, nil, FalseClass],
-        description: "Use when the `svn info` command is used by #{Chef::Dist::PRODUCT} and arguments need to be passed. The `svn_arguments` command does not work when the `svn info` command is used.",
+        description: "Use when the `svn info` command is used by #{ChefUtils::Dist::Infra::PRODUCT} and arguments need to be passed. The `svn_arguments` command does not work when the `svn info` command is used.",
         coerce: proc { |v| v == false ? nil : v }, # coerce false to nil
         default: "--no-auth-cache"
 

@@ -22,7 +22,7 @@ require_relative "../../mixin/shell_out"
 require_relative "../../mixin/which"
 require_relative "../user"
 require_relative "../../resource/user/mac_user"
-require "plist"
+autoload :Plist, "plist"
 
 class Chef
   class Provider
@@ -221,7 +221,17 @@ class Chef
         end
 
         def compare_user
-          %i{comment shell uid gid salt password admin secure_token hidden}.any? { |m| diverged?(m) }
+          @change_desc = []
+          %i{comment shell uid gid salt password admin secure_token hidden}.each do |attr|
+            if diverged?(m)
+              desc = "Update #{attr}"
+              unless %i{password gid secure_token hidden}.include?(attr)
+                desc << " from #{current_resource.send(attr)} to #{new_resource.send(attr)}"
+              end
+              @change_desc << desc
+            end
+          end
+          !@change_desc.empty?
         end
 
         def manage_user
@@ -290,9 +300,7 @@ class Chef
           end
 
           if diverged?(:hidden)
-            converge_by("alter hidden") do
-              set_hidden
-            end
+            converge_by("alter hidden") { set_hidden }
           end
 
           reload_user_plist
@@ -608,7 +616,7 @@ class Chef
         end
 
         def run_dscl(*args)
-          result = shell_out("dscl", "-plist", ".", "-#{args[0]}", args[1..-1])
+          result = shell_out("dscl", "-plist", ".", "-#{args[0]}", args[1..])
           return "" if ( args.first =~ /^delete/ ) && ( result.exitstatus != 0 )
           raise(Chef::Exceptions::DsclCommandFailed, "dscl error: #{result.inspect}") unless result.exitstatus == 0
           raise(Chef::Exceptions::DsclCommandFailed, "dscl error: #{result.inspect}") if /No such key: /.match?(result.stdout)
@@ -617,7 +625,7 @@ class Chef
         end
 
         def run_plutil(*args)
-          result = shell_out("plutil", "-#{args[0]}", args[1..-1])
+          result = shell_out("plutil", "-#{args[0]}", args[1..])
           raise(Chef::Exceptions::PlistUtilCommandFailed, "plutil error: #{result.inspect}") unless result.exitstatus == 0
 
           result.stdout

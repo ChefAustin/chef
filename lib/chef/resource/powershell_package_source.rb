@@ -16,7 +16,6 @@
 #
 
 require_relative "../resource"
-require_relative "../json_compat"
 
 class Chef
   class Resource
@@ -33,7 +32,7 @@ class Chef
         name_property: true
 
       property :url, String,
-        description: "The url to the package source.",
+        description: "The URL to the package source.",
         required: [:register]
 
       property :trusted, [TrueClass, FalseClass],
@@ -43,25 +42,25 @@ class Chef
       property :provider_name, String,
         equal_to: %w{ Programs msi NuGet msu PowerShellGet psl chocolatey },
         validation_message: "The following providers are supported: 'Programs', 'msi', 'NuGet', 'msu', 'PowerShellGet', 'psl' or 'chocolatey'",
-        description: "The package management provider for the source. It supports the following providers: 'Programs', 'msi', 'NuGet', 'msu', 'PowerShellGet', 'psl' and 'chocolatey'.",
+        description: "The package management provider for the source.",
         default: "NuGet"
 
       property :publish_location, String,
-        description: "The url where modules will be published to for this source. Only valid if the provider is 'PowerShellGet'."
+        description: "The URL where modules will be published to for this source. Only valid if the provider is `PowerShellGet`."
 
       property :script_source_location, String,
-        description: "The url where scripts are located for this source. Only valid if the provider is 'PowerShellGet'."
+        description: "The URL where scripts are located for this source. Only valid if the provider is `PowerShellGet`."
 
       property :script_publish_location, String,
-        description: "The location where scripts will be published to for this source. Only valid if the provider is 'PowerShellGet'."
+        description: "The location where scripts will be published to for this source. Only valid if the provider is `PowerShellGet`."
 
       load_current_value do
         cmd = load_resource_state_script(source_name)
-        repo = powershell_out!(cmd)
-        if repo.stdout.empty?
+        repo = powershell_exec!(cmd)
+        if repo.result.empty?
           current_value_does_not_exist!
         else
-          status = Chef::JSONCompat.from_json(repo.stdout)
+          status = repo.result
         end
         url status["url"]
         trusted status["trusted"]
@@ -78,28 +77,28 @@ class Chef
           if package_source_exists?
             converge_if_changed :url, :trusted, :publish_location, :script_source_location, :script_publish_location do
               update_cmd = build_ps_repository_command("Set", new_resource)
-              res = powershell_out(update_cmd)
-              raise "Failed to update #{new_resource.source_name}: #{res.stderr}" unless res.stderr.empty?
+              res = powershell_exec(update_cmd)
+              raise "Failed to update #{new_resource.source_name}: #{res.errors}" if res.error?
             end
           else
             converge_by("register source: #{new_resource.source_name}") do
               register_cmd = build_ps_repository_command("Register", new_resource)
-              res = powershell_out(register_cmd)
-              raise "Failed to register #{new_resource.source_name}: #{res.stderr}" unless res.stderr.empty?
+              res = powershell_exec(register_cmd)
+              raise "Failed to register #{new_resource.source_name}: #{res.errors}" if res.error?
             end
           end
         else
           if package_source_exists?
             converge_if_changed :url, :trusted, :provider_name do
               update_cmd = build_package_source_command("Set", new_resource)
-              res = powershell_out(update_cmd)
-              raise "Failed to update #{new_resource.source_name}: #{res.stderr}" unless res.stderr.empty?
+              res = powershell_exec(update_cmd)
+              raise "Failed to update #{new_resource.source_name}: #{res.errors}" if res.error?
             end
           else
             converge_by("register source: #{new_resource.source_name}") do
               register_cmd = build_package_source_command("Register", new_resource)
-              res = powershell_out(register_cmd)
-              raise "Failed to register #{new_resource.source_name}: #{res.stderr}" unless res.stderr.empty?
+              res = powershell_exec(register_cmd)
+              raise "Failed to register #{new_resource.source_name}: #{res.errors}" if res.error?
             end
           end
         end
@@ -110,16 +109,16 @@ class Chef
         if package_source_exists?
           unregister_cmd = "Get-PackageSource -Name '#{new_resource.source_name}' | Unregister-PackageSource"
           converge_by("unregister source: #{new_resource.source_name}") do
-            res = powershell_out(unregister_cmd)
-            raise "Failed to unregister #{new_resource.source_name}: #{res.stderr}" unless res.stderr.empty?
+            res = powershell_exec(unregister_cmd)
+            raise "Failed to unregister #{new_resource.source_name}: #{res.errors}" if res.error?
           end
         end
       end
 
       action_class do
         def package_source_exists?
-          cmd = powershell_out!("(Get-PackageSource -Name '#{new_resource.source_name}' -WarningAction SilentlyContinue).Name")
-          cmd.stdout.downcase.strip == new_resource.source_name.downcase
+          cmd = powershell_exec!("(Get-PackageSource -Name '#{new_resource.source_name}' -ErrorAction SilentlyContinue).Name")
+          !cmd.result.empty? && cmd.result.to_s.downcase.strip == new_resource.source_name.downcase
         end
 
         def psrepository_cmdlet_appropriate?
@@ -133,6 +132,7 @@ class Chef
           cmd << " -PublishLocation '#{new_resource.publish_location}'" if new_resource.publish_location
           cmd << " -ScriptSourceLocation '#{new_resource.script_source_location}'" if new_resource.script_source_location
           cmd << " -ScriptPublishLocation '#{new_resource.script_publish_location}'" if new_resource.script_publish_location
+          cmd << " | Out-Null"
           cmd
         end
 
@@ -141,6 +141,7 @@ class Chef
           cmd << " -Location '#{new_resource.url}'" if new_resource.url
           cmd << " -Trusted:#{new_resource.trusted ? "$true" : "$false"}"
           cmd << " -ProviderName '#{new_resource.provider_name}'" if new_resource.provider_name
+          cmd << " | Out-Null"
           cmd
         end
       end
@@ -157,11 +158,11 @@ class Chef
             if ((Get-PackageSource -Name '#{name}').ProviderName -eq 'PowerShellGet') {
                 (Get-PSRepository -Name '#{name}') | Select @{n='source_name';e={$_.Name}}, @{n='url';e={$_.SourceLocation}},
                 @{n='trusted';e={$_.Trusted}}, @{n='provider_name';e={$_.PackageManagementProvider}}, @{n='publish_location';e={$_.PublishLocation}},
-                @{n='script_source_location';e={$_.ScriptSourceLocation}}, @{n='script_publish_location';e={$_.ScriptPublishLocation}} | ConvertTo-Json
+                @{n='script_source_location';e={$_.ScriptSourceLocation}}, @{n='script_publish_location';e={$_.ScriptPublishLocation}}
             }
             else {
                 (Get-PackageSource -Name '#{name}') | Select @{n='source_name';e={$_.Name}}, @{n='url';e={$_.Location}},
-                @{n='provider_name';e={$_.ProviderName}}, @{n='trusted';e={$_.IsTrusted}} | ConvertTo-Json
+                @{n='provider_name';e={$_.ProviderName}}, @{n='trusted';e={$_.IsTrusted}}
             }
         }
       EOH

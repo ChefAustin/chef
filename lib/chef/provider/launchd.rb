@@ -20,7 +20,7 @@ require_relative "../provider"
 require_relative "../resource/file"
 require_relative "../resource/cookbook_file"
 require_relative "../resource/macosx_service"
-require "plist"
+autoload :Plist, "plist"
 require "forwardable" unless defined?(Forwardable)
 
 class Chef
@@ -29,17 +29,7 @@ class Chef
       extend Forwardable
       provides :launchd, os: "darwin"
 
-      def_delegators :new_resource, *%i{
-        backup
-        cookbook
-        group
-        label
-        mode
-        owner
-        source
-        session_type
-        type
-      }
+      def_delegators :new_resource, :backup, :cookbook, :group, :label, :mode, :owner, :source, :session_type, :type
 
       def load_current_resource
         current_resource = Chef::Resource::Launchd.new(new_resource.name)
@@ -209,7 +199,7 @@ class Chef
 
       # @api private
       def path
-        @path ||= new_resource.path ? new_resource.path : gen_path_from_type
+        @path ||= new_resource.path || gen_path_from_type
       end
     end
   end

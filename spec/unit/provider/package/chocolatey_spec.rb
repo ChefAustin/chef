@@ -150,7 +150,7 @@ describe Chef::Provider::Package::Chocolatey, :windows_only do
       new_resource.package_name("package-does-not-exist")
       new_resource.returns([0])
       allow(provider).to receive(:shell_out_compacted!)
-        .with(choco_exe, "list", "-r", "#{new_resource.package_name.first}", { returns: new_resource.returns, timeout: timeout })
+        .with(choco_exe, "list", "-r", new_resource.package_name.first, { returns: new_resource.returns, timeout: timeout })
         .and_raise(Mixlib::ShellOut::ShellCommandFailed, "Expected process to exit with [0], but received '2'")
       expect { provider.send(:available_packages) }.to raise_error(Mixlib::ShellOut::ShellCommandFailed, "Expected process to exit with [0], but received '2'")
     end
@@ -501,8 +501,7 @@ describe "behavior when Chocolatey is not installed" do
 
   before do
     # the shellout sometimes returns "", but test nil to be safe.
-    allow(provider).to receive(:choco_install_path).and_return(nil)
-    provider.instance_variable_set("@choco_install_path", nil)
+    allow(provider).to receive(:choco_install_path).and_return("")
 
     # we don't care what this returns, but we have to let it be called.
     allow(provider).to receive(:shell_out_compacted!).and_return(double(stdout: ""))

@@ -19,7 +19,7 @@ execute "sensitive sleep" do
   sensitive true
 end
 
-timezone "GMT"
+timezone "America/Los_Angeles"
 
 include_recipe "ntp"
 
@@ -39,8 +39,13 @@ end
 
 ssh_known_hosts_entry "github.com"
 
-include_recipe "chef-client::delete_validation"
-include_recipe "chef-client::config"
+include_recipe "::_chef_client_config"
+include_recipe "::_chef_client_trusted_certificate"
+
+chef_client_launchd "Every 30 mins Infra Client run" do
+  interval 30
+  action :enable
+end
 
 include_recipe "git"
 
@@ -56,11 +61,26 @@ include_recipe "git"
   end
 end
 
+osx_profile "Remove screensaver profile" do
+  identifier "com.company.screensaver"
+  action :remove
+end
+
 build_essential
 
 launchd "io.chef.testing.fake" do
   source "io.chef.testing.fake.plist"
   action "enable"
+end
+
+homebrew_update "update" do
+  action :update
+end
+
+homebrew_package "vim"
+
+homebrew_package "vim" do
+  action :purge
 end
 
 include_recipe "::_dmg_package"

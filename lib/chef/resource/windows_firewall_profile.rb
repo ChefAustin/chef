@@ -19,8 +19,6 @@
 class Chef
   class Resource
     class WindowsFirewallProfile < Chef::Resource
-      unified_mode true
-
       provides :windows_firewall_profile
       description "Use the **windows_firewall_profile** resource to enable, disable, and configure the Windows firewall."
       introduced "16.3"
@@ -85,11 +83,11 @@ class Chef
 
       load_current_value do |desired|
         ps_get_net_fw_profile = load_firewall_state(desired.profile)
-        output = powershell_out(ps_get_net_fw_profile)
-        if output.stdout.empty?
+        output = powershell_exec(ps_get_net_fw_profile)
+        if output.result.empty?
           current_value_does_not_exist!
         else
-          state = Chef::JSONCompat.from_json(output.stdout)
+          state = output.result
         end
 
         default_inbound_action state["default_inbound_action"]
@@ -132,7 +130,7 @@ class Chef
         unless firewall_enabled?(new_resource.profile)
           converge_by "Enable the #{new_resource.profile} Firewall Profile" do
             cmd = "Set-NetFirewallProfile -Profile #{new_resource.profile} -Enabled \"True\""
-            powershell_out!(cmd)
+            powershell_exec!(cmd)
           end
         end
       end
@@ -141,7 +139,7 @@ class Chef
         if firewall_enabled?(new_resource.profile)
           converge_by "Disable the #{new_resource.profile} Firewall Profile" do
             cmd = "Set-NetFirewallProfile -Profile #{new_resource.profile} -Enabled \"False\""
-            powershell_out!(cmd)
+            powershell_exec!(cmd)
           end
         end
       end
@@ -161,24 +159,6 @@ class Chef
           cmd
         end
 
-        def load_firewall_state(profile_name)
-          <<-EOH
-            Remove-TypeData System.Array # workaround for PS bug here: https://bit.ly/2SRMQ8M
-            $#{profile_name} = Get-NetFirewallProfile -Profile #{profile_name}
-            ([PSCustomObject]@{
-              default_inbound_action = $#{profile_name}.DefaultInboundAction.ToString()
-              default_outbound_action = $#{profile_name}.DefaultOutboundAction.ToString()
-              allow_inbound_rules = $#{profile_name}.AllowInboundRules.ToString()
-              allow_local_firewall_rules = $#{profile_name}.AllowLocalFirewallRules.ToString()
-              allow_local_ipsec_rules = $#{profile_name}.AllowLocalIPsecRules.ToString()
-              allow_user_apps = $#{profile_name}.AllowUserApps.ToString()
-              allow_user_ports = $#{profile_name}.AllowUserPorts.ToString()
-              allow_unicast_response = $#{profile_name}.AllowUnicastResponseToMulticast.ToString()
-              display_notification = $#{profile_name}.NotifyOnListen.ToString()
-            }) | ConvertTo-Json
-          EOH
-        end
-
         def firewall_enabled?(profile_name)
           cmd = <<~CODE
             $#{profile_name} = Get-NetFirewallProfile -Profile #{profile_name}
@@ -186,13 +166,30 @@ class Chef
                 return $true
             } else {return $false}
           CODE
-          firewall_status = powershell_out(cmd).stdout
-          if /True/.match?(firewall_status)
-            true
-          elsif /False/.match?(firewall_status)
-            false
-          end
+          powershell_exec!(cmd).result
         end
+      end
+
+      private
+
+      # build the command to load the current resource
+      # @return [String] current firewall state
+      def load_firewall_state(profile_name)
+        <<-EOH
+          Remove-TypeData System.Array # workaround for PS bug here: https://bit.ly/2SRMQ8M
+          $#{profile_name} = Get-NetFirewallProfile -Profile #{profile_name}
+          ([PSCustomObject]@{
+            default_inbound_action = $#{profile_name}.DefaultInboundAction.ToString()
+            default_outbound_action = $#{profile_name}.DefaultOutboundAction.ToString()
+            allow_inbound_rules = $#{profile_name}.AllowInboundRules.ToString()
+            allow_local_firewall_rules = $#{profile_name}.AllowLocalFirewallRules.ToString()
+            allow_local_ipsec_rules = $#{profile_name}.AllowLocalIPsecRules.ToString()
+            allow_user_apps = $#{profile_name}.AllowUserApps.ToString()
+            allow_user_ports = $#{profile_name}.AllowUserPorts.ToString()
+            allow_unicast_response = $#{profile_name}.AllowUnicastResponseToMulticast.ToString()
+            display_notification = $#{profile_name}.NotifyOnListen.ToString()
+          })
+        EOH
       end
     end
   end

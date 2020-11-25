@@ -20,8 +20,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require "uri" unless defined?(URI)
-require "net/http" unless defined?(Net::HTTP)
+autoload :URI, "uri"
+module Net
+  autoload :HTTP, "net/http"
+end
 require_relative "ssl_policies"
 require_relative "http_request"
 

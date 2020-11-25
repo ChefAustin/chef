@@ -16,7 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-require_relative "../../dist"
+require "chef-utils" unless defined?(ChefUtils::CANARY)
 
 class Chef
   module Formatters
@@ -56,7 +56,7 @@ class Chef
             require_relative "../../win32/security"
 
             unless Chef::ReservedNames::Win32::Security.has_admin_privileges?
-              error_description.section("Missing Windows Admin Privileges", "#{Chef::Dist::CLIENT} doesn't have administrator privileges. This can be a possible reason for the resource failure.")
+              error_description.section("Missing Windows Admin Privileges", "#{ChefUtils::Dist::Infra::CLIENT} doesn't have administrator privileges. This can be a possible reason for the resource failure.")
             end
           end
         end
@@ -79,8 +79,8 @@ class Chef
               loop do
 
                 # low rent parser. try to gracefully handle nested blocks in resources
-                nesting += 1 if /[\s]+do[\s]*/.match?(lines[current_line])
-                nesting -= 1 if /end[\s]*$/.match?(lines[current_line])
+                nesting += 1 if /\s+do\s*/.match?(lines[current_line])
+                nesting -= 1 if /end\s*$/.match?(lines[current_line])
 
                 relevant_lines << format_line(current_line, lines[current_line])
 
@@ -114,11 +114,11 @@ class Chef
         end
 
         def parse_source
-          resource.source_line[/^(([\w]:)?[^:]+):([\d]+)/, 1]
+          resource.source_line[/^((\w:)?[^:]+):(\d+)/, 1]
         end
 
         def parse_line(source)
-          resource.source_line[/^#{Regexp.escape(source)}:([\d]+)/, 1].to_i
+          resource.source_line[/^#{Regexp.escape(source)}:(\d+)/, 1].to_i
         end
 
       end

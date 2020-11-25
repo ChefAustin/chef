@@ -112,7 +112,11 @@ class Chef
 
       def get_sid(value)
         if value.is_a?(String)
-          SID.from_account(value)
+          begin
+            Security.convert_string_sid_to_sid(value)
+          rescue Chef::Exceptions::Win32APIError
+            SID.from_account(value)
+          end
         elsif value.is_a?(SID)
           value
         else
@@ -251,10 +255,7 @@ class Chef
             flags |= CONTAINER_INHERIT_ACE
           when :objects_only
             flags |= OBJECT_INHERIT_ACE
-          when true
-            flags |= CONTAINER_INHERIT_ACE
-            flags |= OBJECT_INHERIT_ACE
-          when nil
+          when true, nil
             flags |= CONTAINER_INHERIT_ACE
             flags |= OBJECT_INHERIT_ACE
           end

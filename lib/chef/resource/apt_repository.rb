@@ -19,7 +19,9 @@
 require_relative "../resource"
 require_relative "../http/simple"
 require "tmpdir" unless defined?(Dir.mktmpdir)
-require "addressable" unless defined?(Addressable)
+module Addressable
+  autoload :URI, "addressable/uri"
+end
 
 class Chef
   class Resource
@@ -60,15 +62,14 @@ class Chef
         end
         ```
 
-        **Add the JuJu PPA, grab the key from the keyserver, and add source repo**:
+        **Add the JuJu PPA, grab the key from the Ubuntu keyserver, and add source repo**:
 
         ```ruby
         apt_repository 'juju' do
-          uri 'http://ppa.launchpad.net/juju/stable/ubuntu'
+          uri 'ppa:juju/stable'
           components ['main']
           distribution 'xenial'
           key 'C8068B11'
-          keyserver 'keyserver.ubuntu.com'
           action :add
           deb_src true
         end
@@ -168,7 +169,7 @@ class Chef
         # is the provided ID a key ID from a keyserver. Looks at length and HEX only values
         # @param [String] id the key value passed by the user that *may* be an ID
         def is_key_id?(id)
-          id = id[2..-1] if id.start_with?("0x")
+          id = id[2..] if id.start_with?("0x")
           id =~ /^\h+$/ && [8, 16, 40].include?(id.length)
         end
 

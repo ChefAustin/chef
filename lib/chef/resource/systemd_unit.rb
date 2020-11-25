@@ -17,7 +17,7 @@
 #
 
 require_relative "../resource"
-require_relative "../dist"
+require "chef-utils/dist" unless defined?(ChefUtils::Dist)
 require "iniparse"
 
 class Chef
@@ -27,8 +27,49 @@ class Chef
 
       provides(:systemd_unit) { true }
 
-      description "Use the **systemd_unit** resource to create, manage, and run systemd units."
+      description "Use the **systemd_unit** resource to create, manage, and run [systemd units](https://www.freedesktop.org/software/systemd/man/systemd.html#Concepts)."
       introduced "12.11"
+      examples <<~DOC
+      **Create systemd service unit file from a Hash**
+
+      ```ruby
+      systemd_unit 'etcd.service' do
+        content({Unit: {
+                  Description: 'Etcd',
+                  Documentation: ['https://coreos.com/etcd', 'man:etcd(1)'],
+                  After: 'network.target',
+                },
+                Service: {
+                  Type: 'notify',
+                  ExecStart: '/usr/local/etcd',
+                  Restart: 'always',
+                },
+                Install: {
+                  WantedBy: 'multi-user.target',
+                }})
+        action [:create, :enable]
+      end
+      ```
+
+      **Create systemd service unit file from a String**
+
+      ```ruby
+      systemd_unit 'sysstat-collect.timer' do
+        content <<~EOU
+        [Unit]
+        Description=Run system activity accounting tool every 10 minutes
+
+        [Timer]
+        OnCalendar=*:00/10
+
+        [Install]
+        WantedBy=sysstat.service
+        EOU
+
+        action [:create, :enable]
+      end
+      ```
+      DOC
 
       default_action :nothing
       allowed_actions :create, :delete,
@@ -52,7 +93,7 @@ class Chef
                description: "The user account that the systemd unit process is run under. The path to the unit for that user would be something like '/etc/systemd/user/sshd.service'. If no user account is specified, the systemd unit will run under a 'system' account, with the path to the unit being something like '/etc/systemd/system/sshd.service'."
 
       property :content, [String, Hash],
-        description: "A string or hash that contains a systemd [unit file](https://www.freedesktop.org/software/systemd/man/systemd.unit.html) definition that describes the properties of systemd-managed entities, such as services, sockets, devices, and so on. In #{Chef::Dist::PRODUCT} 14.4 or later, repeatable options can be implemented with an array."
+        description: "A string or hash that contains a systemd [unit file](https://www.freedesktop.org/software/systemd/man/systemd.unit.html) definition that describes the properties of systemd-managed entities, such as services, sockets, devices, and so on. In #{ChefUtils::Dist::Infra::PRODUCT} 14.4 or later, repeatable options can be implemented with an array."
 
       property :triggers_reload, [TrueClass, FalseClass],
         description: "Specifies whether to trigger a daemon reload when creating or deleting a unit.",

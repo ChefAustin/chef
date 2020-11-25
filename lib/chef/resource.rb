@@ -36,7 +36,7 @@ require_relative "resource/resource_notification"
 require_relative "provider_resolver"
 require_relative "resource_resolver"
 require_relative "provider"
-require "set" unless defined?(Set)
+autoload :Set, "set"
 
 require_relative "mixin/deprecation"
 require_relative "mixin/properties"
@@ -1480,7 +1480,7 @@ class Chef
     def self.use(partial)
       dirname = ::File.dirname(partial)
       basename = ::File.basename(partial, ".rb")
-      basename = basename[1..-1] if basename.start_with?("_")
+      basename = basename[1..] if basename.start_with?("_")
       class_eval IO.read(::File.expand_path("#{dirname}/_#{basename}.rb", ::File.dirname(caller_locations.first.absolute_path)))
     end
 

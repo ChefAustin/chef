@@ -2,12 +2,9 @@ require "fcntl"
 require "chef/mixin/shell_out"
 require "ohai/mixin/http_helper"
 require "ohai/mixin/gce_metadata"
-require "chef/mixin/powershell_out"
-require "chef/version_class"
 
 class ShellHelpers
   extend Chef::Mixin::ShellOut
-  extend Chef::Mixin::PowershellOut
 end
 
 # magic stolen from bundler/spec/support/less_than_proc.rb
@@ -27,11 +24,11 @@ class DependencyProc < Proc
 end
 
 def ruby_64bit?
-  !!(RbConfig::CONFIG["host_cpu"] =~ /x86_64/)
+  RbConfig::CONFIG["host_cpu"].include?("x86_64")
 end
 
 def ruby_32bit?
-  !!(RbConfig::CONFIG["host_cpu"] =~ /i686/)
+  RbConfig::CONFIG["host_cpu"].include?("i686")
 end
 
 def windows?
@@ -58,17 +55,17 @@ end
 def windows_2012r2?
   return false unless windows?
 
-  (host_version && host_version.start_with?("6.3"))
+  (win32_os_version && win32_os_version.start_with?("6.3"))
 end
 
 def windows_gte_10?
   return false unless windows?
 
-  Gem::Requirement.new(">= 10").satisfied_by?(Gem::Version.new(host_version))
+  Gem::Requirement.new(">= 10").satisfied_by?(Gem::Version.new(win32_os_version))
 end
 
-def host_version
-  @host_version ||= begin
+def win32_os_version
+  @win32_os_version ||= begin
     wmi = WmiLite::Wmi.new
     host = wmi.first_of("Win32_OperatingSystem")
     host["version"]
@@ -95,26 +92,12 @@ def windows_user_right?(right)
   Chef::ReservedNames::Win32::Security.get_account_right(ENV["USERNAME"]).include?(right)
 end
 
-def mac_osx_1014?
-  if mac_osx?
-    ver = Chef::Version.new(ohai[:platform_version])
-    return ver.major == 10 && ver.minor == 14
-  end
-
-  false
+def macos_1013?
+  macos? && Gem::Requirement.new("~> 10.13.0").satisfied_by?(Gem::Version.new(ohai[:platform_version]))
 end
 
-def mac_osx?
-  if File.exist? "/usr/bin/sw_vers"
-    result = ShellHelpers.shell_out("/usr/bin/sw_vers")
-    result.stdout.each_line do |line|
-      if /^ProductName:\sMac OS X.*$/.match?(line)
-        return true
-      end
-    end
-  end
-
-  false
+def macos_gte_1014?
+  macos? && Gem::Requirement.new(">= 10.14").satisfied_by?(Gem::Version.new(ohai[:platform_version]))
 end
 
 # detects if the hardware is 64-bit (evaluates to true in "WOW64" mode in a 32-bit app on a 64-bit system)
@@ -127,26 +110,24 @@ def windows32?
   windows? && !windows64?
 end
 
-# def jruby?
-
 def unix?
   !windows?
 end
 
 def linux?
-  RUBY_PLATFORM.match?(/linux/)
+  RUBY_PLATFORM.include?("linux")
 end
 
 def macos?
-  RUBY_PLATFORM.match?(/darwin/)
+  RUBY_PLATFORM.include?("darwin")
 end
 
 def solaris?
-  RUBY_PLATFORM.match?(/solaris/)
+  RUBY_PLATFORM.include?("solaris")
 end
 
 def freebsd?
-  RUBY_PLATFORM.match?(/freebsd/)
+  RUBY_PLATFORM.include?("freebsd")
 end
 
 def intel_64bit?
@@ -182,7 +163,7 @@ def debian_family?
 end
 
 def aix?
-  RUBY_PLATFORM.match?(/aix/)
+  RUBY_PLATFORM.include?("aix")
 end
 
 def wpar?
@@ -216,8 +197,7 @@ def selinux_enabled?
 end
 
 def suse?
-  ::File.exist?("/etc/SuSE-release") ||
-    ( ::File.exist?("/etc/os-release") && /sles|suse/.match?(File.read("/etc/os-release")) )
+  !!(ohai[:platform_family] == "suse")
 end
 
 def root?
@@ -260,6 +240,15 @@ def ifconfig?
 end
 
 def choco_installed?
-  result = ShellHelpers.powershell_out("choco --version")
-  result.stderr.empty? ? true : false
+  result = ShellHelpers.shell_out("choco --version")
+  result.stderr.empty?
+rescue
+  false
+end
+
+def pwsh_installed?
+  result = ShellHelpers.shell_out("pwsh.exe --version")
+  result.stderr.empty?
+rescue
+  false
 end

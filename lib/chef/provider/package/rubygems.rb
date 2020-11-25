@@ -17,38 +17,41 @@
 # limitations under the License.
 #
 
-require "uri" unless defined?(URI)
+autoload :URI, "uri"
 require_relative "../package"
 require_relative "../../resource/package"
 require_relative "../../mixin/get_source_from_package"
 require_relative "../../mixin/which"
-require_relative "../../dist"
+require "chef-utils/dist" unless defined?(ChefUtils::Dist)
 
 # Class methods on Gem are defined in rubygems
-require "rubygems" unless defined?(Gem)
+autoload :Gem, "rubygems"
 # Ruby 1.9's gem_prelude can interact poorly with loading the full rubygems
 # explicitly like this. Make sure rubygems/specification is always last in this
 # list
-require "rubygems/version"
-require "rubygems/dependency"
-require "rubygems/spec_fetcher"
-require "rubygems/platform"
-require "rubygems/package"
-require "rubygems/dependency_installer"
-require "rubygems/uninstaller"
-require "rubygems/specification"
+Gem.autoload :Version, "rubygems/version"
+Gem.autoload :Dependency, "rubygems/dependency"
+Gem.autoload :SpecFetcher, "rubygems/spec_fetcher"
+Gem.autoload :Platform, "rubygems/platform"
+Gem.autoload :Package, "rubygems/package"
+Gem.autoload :DependencyInstaller, "rubygems/dependency_installer"
+Gem.autoload :Uninstaller, "rubygems/uninstaller"
+Gem.autoload :Specification, "rubygems/specification"
 
 class Chef
   class Provider
     class Package
       class Rubygems < Chef::Provider::Package
         class GemEnvironment
-          # HACK: trigger gem config load early. Otherwise it can get lazy
-          # loaded during operations where we've set Gem.sources to an
-          # alternate value and overwrite it with the defaults.
-          Gem.configuration
-
           DEFAULT_UNINSTALLER_OPTS = { ignore: true, executables: true }.freeze
+
+          def initialize(*args)
+            super
+            # HACK: trigger gem config load early. Otherwise it can get lazy
+            # loaded during operations where we've set Gem.sources to an
+            # alternate value and overwrite it with the defaults.
+            Gem.configuration
+          end
 
           # The paths where rubygems should search for installed gems.
           # Implemented by subclasses.
@@ -401,8 +404,8 @@ class Chef
             if new_resource.options && new_resource.options.is_a?(Hash)
               msg = [
                 "Gem options must be passed to gem_package as a string instead of a hash when",
-                "using this installation of #{Chef::Dist::PRODUCT} because it runs with its own packaged Ruby. A hash",
-                "may only be used when installing a gem to the same Ruby installation that #{Chef::Dist::PRODUCT} is",
+                "using this installation of #{ChefUtils::Dist::Infra::PRODUCT} because it runs with its own packaged Ruby. A hash",
+                "may only be used when installing a gem to the same Ruby installation that #{ChefUtils::Dist::Infra::PRODUCT} is",
                 "running under. See https://docs.chef.io/resources/gem_package/ for more information.",
                 "Error raised at #{new_resource} from #{new_resource.source_line}",
               ].join("\n")
@@ -424,7 +427,7 @@ class Chef
             logger.trace("#{new_resource} detected omnibus installation in #{RbConfig::CONFIG["bindir"]}")
             # Omnibus installs to a static path because of linking on unix, find it.
             true
-          elsif RbConfig::CONFIG["bindir"].sub(/^[\w]:/, "") == "/opscode/chef/embedded/bin"
+          elsif RbConfig::CONFIG["bindir"].sub(/^\w:/, "") == "/opscode/chef/embedded/bin"
             logger.trace("#{new_resource} detected omnibus installation in #{RbConfig::CONFIG["bindir"]}")
             # windows, with the drive letter removed
             true

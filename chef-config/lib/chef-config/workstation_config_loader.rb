@@ -59,7 +59,7 @@ module ChefConfig
         @chef_config_dir = false
         full_path = working_directory.split(File::SEPARATOR)
         (full_path.length - 1).downto(0) do |i|
-          candidate_directory = File.join(full_path[0..i] + [ChefConfig::Dist::USER_CONF_DIR])
+          candidate_directory = File.join(full_path[0..i] + [ChefUtils::Dist::Infra::USER_CONF_DIR])
           if File.exist?(candidate_directory) && File.directory?(candidate_directory)
             @chef_config_dir = candidate_directory
             break
@@ -129,7 +129,7 @@ module ChefConfig
         candidate_configs << File.join(chef_config_dir, "knife.rb")
       end
       # Look for $HOME/.chef/knife.rb
-      PathHelper.home(ChefConfig::Dist::USER_CONF_DIR) do |dot_chef_dir|
+      PathHelper.home(ChefUtils::Dist::Infra::USER_CONF_DIR) do |dot_chef_dir|
         candidate_configs << File.join(dot_chef_dir, "config.rb")
         candidate_configs << File.join(dot_chef_dir, "knife.rb")
       end
@@ -166,7 +166,7 @@ module ChefConfig
         when "client_key"
           extract_key(value, :client_key, :client_key_contents)
         when "knife"
-          Config.knife.merge!(Hash[value.map { |k, v| [k.to_sym, v] }])
+          Config.knife.merge!(value.transform_keys(&:to_sym))
         else
           Config[key.to_sym] = value
         end
@@ -184,7 +184,7 @@ module ChefConfig
     end
 
     def home_chef_dir
-      @home_chef_dir ||= PathHelper.home(ChefConfig::Dist::USER_CONF_DIR)
+      @home_chef_dir ||= PathHelper.home(ChefUtils::Dist::Infra::USER_CONF_DIR)
     end
 
     def apply_config(config_content, config_file_path)
@@ -195,8 +195,8 @@ module ChefConfig
       message = ""
       message << "You have invalid ruby syntax in your config file #{config_file_path}\n\n"
       message << "#{e.class.name}: #{e.message}\n"
-      if file_line = e.message[/#{Regexp.escape(config_file_path)}:[\d]+/]
-        line = file_line[/:([\d]+)$/, 1].to_i
+      if file_line = e.message[/#{Regexp.escape(config_file_path)}:\d+/]
+        line = file_line[/:(\d+)$/, 1].to_i
         message << highlight_config_error(config_file_path, line)
       end
       raise ChefConfig::ConfigurationError, message
@@ -206,7 +206,7 @@ module ChefConfig
       filtered_trace = e.backtrace.grep(/#{Regexp.escape(config_file_path)}/)
       filtered_trace.each { |bt_line| message << "  " << bt_line << "\n" }
       unless filtered_trace.empty?
-        line_nr = filtered_trace.first[/#{Regexp.escape(config_file_path)}:([\d]+)/, 1]
+        line_nr = filtered_trace.first[/#{Regexp.escape(config_file_path)}:(\d+)/, 1]
         message << highlight_config_error(config_file_path, line_nr.to_i)
       end
       raise ChefConfig::ConfigurationError, message

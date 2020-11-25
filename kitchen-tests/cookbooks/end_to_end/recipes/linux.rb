@@ -23,7 +23,7 @@ execute "sensitive sleep" do
   sensitive true
 end
 
-timezone "UTC"
+timezone "America/Los_Angeles"
 
 include_recipe "::_yum" if platform_family?("rhel")
 
@@ -47,9 +47,6 @@ users_manage "sysadmin" do
 end
 
 ssh_known_hosts_entry "github.com"
-
-include_recipe "chef-client::delete_validation"
-include_recipe "chef-client::config"
 
 include_recipe "openssh"
 
@@ -86,6 +83,9 @@ user_ulimit "tomcat" do
   rtprio_hard_limit 60
 end
 
+include_recipe "::_chef_client_config"
+include_recipe "::_chef_client_trusted_certificate"
+
 chef_client_cron "Run chef-client as a cron job"
 
 chef_client_cron "Run chef-client with base recipe" do
@@ -99,6 +99,7 @@ end
 
 chef_client_systemd_timer "Run chef-client as a systemd timer" do
   interval "1hr"
+  cpu_quota 50
   only_if { systemd? }
 end
 
@@ -121,6 +122,8 @@ include_recipe "::_cron"
 include_recipe "::_ohai_hint"
 include_recipe "::_openssl"
 include_recipe "::_tests"
+include_recipe "::_mount"
+include_recipe "::_ifconfig"
 
 # at the moment these do not run properly in docker
 # we need to investigate if this is a snap on docker issue or a chef issue
